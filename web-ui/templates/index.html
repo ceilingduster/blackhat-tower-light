@@ -1,0 +1,47 @@
+<!doctype html>
+<html class="no-js" lang="">
+
+<head>
+  <meta charset="utf-8">
+  <title>Tower Light</title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta property="og:title" content="">
+  <meta property="og:type" content="">
+  <meta property="og:url" content="">
+  <meta property="og:image" content="">
+
+  <link rel="manifest" href="site.webmanifest">
+  <!-- Place favicon.ico in the root directory -->
+
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.0/themes/vader/jquery-ui.css">
+
+  <meta name="theme-color" content="#fafafa">
+</head>
+
+<body>
+
+  <pre id="log"></pre>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"
+    integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA=="
+    crossorigin="anonymous"></script>
+  <script type="text/javascript" charset="utf-8">
+    var socket = io();
+    socket.on('connect', function () {
+      console.log('Connected');
+    });
+
+    // handle the event sent with socket.send()
+    socket.on("light_telemetry", (data) => {
+      $("#log").append(JSON.stringify(data)+'\n');
+    });
+  </script>
+
+</body>
+
+</html>

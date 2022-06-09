@@ -1,0 +1,5 @@
+rpi-ws281x
+adafruit-circuitpython-neopixel
+flask
+flask-socketio
+flask-apscheduler
