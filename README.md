@@ -1,2 +1,2 @@
 # Overview
-Code, Documentation and Repository for the Blackhat Europe NOC Tower Light
+Code, Documentation and Repository for the Blackhat and RSAC NOC Tower Light
