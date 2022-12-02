@@ -1,0 +1,11 @@
+select.option-style {
+  color: var(--bs-card-border-color);
+  font-weight: bold;
+  background: var(--bs-blue);
+  border-radius: 5px;
+  transform: skew(-2deg);
+  padding: 4px;
+  padding-left: 4px;
+  border: 0px none var(--bs-card-border-color) ;
+}
+
