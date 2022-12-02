@@ -115,11 +115,6 @@ void PatternLib::clearPixels(int ringNumber)
   uint16_t startPixel = ((numberPixels[ringNumber] * (ringNumber + 1)) - numberPixels[ringNumber]);
   uint16_t endPixel = startPixel + numberPixels[ringNumber] - 1;
 
-  Serial.print("Clearing pixels between ");
-  Serial.print(startPixel);
-  Serial.print(" and ");
-  Serial.println(endPixel);
-
   for (int i = startPixel; i <= endPixel; i++)
   {
     setPixelColor(i, Color(0, 0, 0));
@@ -215,7 +210,7 @@ void PatternLib::updateLED(int ringNumber)
   case DOUBLE:
     clearPixels(ringNumber);
 
-    firsthalf = pixelNum % (numberPixels[ringNumber] / 2);
+    firsthalf = pixelNum % (numberPixels[ringNumber] / 2) + offsetShift;
     secondhalf = firsthalf + (numberPixels[ringNumber] / 2);
 
     setPixelColor(firsthalf, pixelColor[ringNumber]);

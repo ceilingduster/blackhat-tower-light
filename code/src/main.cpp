@@ -8,6 +8,12 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoNvs.h>
+#include <WiFiClientSecure.h>
+#include <base64.h>
+#include <DNSServer.h>
+#include <Core2_Sounds.h>
+
+// mqtt
 #include <PubSubClient.h>
 
 // project libs
@@ -17,52 +23,239 @@
 
 #include <ArduinoJson.h>
 
-DynamicJsonDocument json_doc(1024);
+// create a task handle for mqtt updates
+TaskHandle_t TaskMQTTUpdate;
+
+// wifi mac
+String macaddress = WiFi.macAddress();
+
+// mqtt root ca for hivemq
+static const char *root_ca PROGMEM = R"EOF(
+-----BEGIN CERTIFICATE-----
+MIIFtTCCA52gAwIBAgIUSji7t1bcmwQat711616DcOV5j80wDQYJKoZIhvcNAQEN
+BQAwajEXMBUGA1UEAwwOQW4gTVFUVCBicm9rZXIxFjAUBgNVBAoMDU93blRyYWNr
+cy5vcmcxFDASBgNVBAsMC2dlbmVyYXRlLUNBMSEwHwYJKoZIhvcNAQkBFhJub2Jv
+ZHlAZXhhbXBsZS5uZXQwHhcNMjIwNzI4MTUzNDI3WhcNMzIwNzI1MTUzNDI3WjBq
+MRcwFQYDVQQDDA5BbiBNUVRUIGJyb2tlcjEWMBQGA1UECgwNT3duVHJhY2tzLm9y
+ZzEUMBIGA1UECwwLZ2VuZXJhdGUtQ0ExITAfBgkqhkiG9w0BCQEWEm5vYm9keUBl
+eGFtcGxlLm5ldDCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAL9cmwOF
+Vh2ANr6jZSHQY8aBY2aSOkrjef7Y/3AQUCgQKm8QRDHb9ZgbTO3Qth2q5sc/hvDr
+MEW5uSutErcRW8nUnv9SOc+Rl4fCHIQEOBD8kv2a68iSxrkkwonPS6iOkQO0lyzR
+eHEC4gG8hTAkFO1wMhgH5GeyBPemIzmmXG+pYaRohS2w5vSk/fkKTtbSNA28OQ2C
+tQg87J7j9O/BS3i+bZ+bangu9XZKiytyXlwUdPbvXyqNcDNmRUBL2e0NcqLouSGX
+sBWJuUI6Gy0p1hmFh7nSh0rmPUQA3NegQc265UIV/vx5abz5Wha0D3b4G35sXTHd
+z99oiBtLyNwhH+ChNXmn/vPKC73EsAAKeY2GuQyWLRIj+vHTSjO77nqRbKjjYaPj
+Nn/EBaDUgR1L6LCXT/mwQtnKRToz5mr7Wxr9BqR+8JwMwuJgekldkDlXFC7wFKD7
+7L07VNs+sIhODjn80Xt68j0NMlWfty++tGyX1d719tqN58kQmSKavUb8hqVwfaV1
+oaIZcb+KSoqN+vZD7PoUc5wnpagFTbYNOAuMD10A0nMAGJaRvR5KPFYAzU5DZWY+
+dGVMROTFVIz0FD6gXu8FCEy/38mavg9DCSFhzrdYUFSqncpsSmhhUgxr9cX3waXR
+Kj9EI3tNxDbiaHTw2LBkHMzIkxe5AN0y/f2jAgMBAAGjUzBRMB0GA1UdDgQWBBSd
+7U6kYCctCZT1nyPmXLgKMKwa3TAfBgNVHSMEGDAWgBSd7U6kYCctCZT1nyPmXLgK
+MKwa3TAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBDQUAA4ICAQCRaLHI3umK
+wACnQQuYLNUQbpI+cIo0nMpR+BTWL00AEhMBQov8DdvVoKLsAMFAYHMG72vROKwg
+hjAT0emtpazqhjgyqSmk1jWStU7QXPTVNyyYzYaVs2fv4AypcvDj9eDUSX9EZ6y0
+fO24qCyknvHEHTvJgurnS2iySSsLIxWOKKH7t2SbcraGCXtJPvGXjjj8D+d1wuyw
+U+BA8PwdGYSDx7k09xaaCC9p/rtvcHhsnP6/u45Jy4aKbs8mCtTrGl0J767yy2HD
+MetxR8N7uES5Gc3C7ZAVdCk8ZlMYZyOLJXSEHsiP6ogX4AnN5i2sFsJA8x7/kkzf
+JLpVGGAIDFL7gcbBJP+v9FxI45BUIdmtDeqqDNARcVy5tWgQVf7tkjfjA0PU6DV2
+cjtCE1f+MmmkL6E8RMxXgfUFnNGz8BaLffk8qOmtR3bTBab1Px4lgNlZhlBxDScx
+FnPAIV4THfFbzw6DyrQwlfjE66SRf3wIx+FsSmZEty3pnFG7ACMCu8hrvaBWezHj
+L7I6oHhpY1xr+aFmcfxxz/JicY5t5fwnunoGFoA4aXKxGjIlLm1vVMKieotArHxN
+FUX4/RohJyT/8qtUu3NNp5L7cwOzsEl9xd3IR/gLVpFgH+rSTcVOL7VEkiySOkvq
+jK31X4ANWZ8pKI7/0KCh56+vulJQAqcPPA==
+-----END CERTIFICATE-----
+)EOF";
+
+// mqtt wifi
+WiFiClientSecure espClient;
+PubSubClient mqtt_client(espClient);
 
 // callback function for the rings
 void ringsComplete() {}
 PatternLib rings(TOTALPIXELS, PIN, RGBTYPE + NEO_KHZ800, &ringsComplete);
 
-// setup a wificlient for the pubsub client
-WiFiClient wifi_pubSub;
-PubSubClient pubsub_Client(wifi_pubSub);
-
 // define API Key globally
 String APIKey;
 
-String report_light_status()
+// mqtt server hostname
+const char *mqtt_server = "mq.csta.cisco.com";
+
+void mqtt_callback(char *topic, byte *message, unsigned int length)
 {
-  String output;
-  json_doc["ring1_pattern"] = rings.ActivePattern[0];
-  json_doc["ring2_pattern"] = rings.ActivePattern[1];
-  json_doc["ring3_pattern"] = rings.ActivePattern[2];
+  String payload;
 
-  json_doc["ring1_interval"] = rings.Interval[0];
-  json_doc["ring2_interval"] = rings.Interval[1];
-  json_doc["ring3_interval"] = rings.Interval[2];
+  // convert byte to String
+  for (int i = 0; i < length; i++)
+    payload += (char)message[i];
 
-  json_doc["ring1_color"]["green"] = rings.Green(rings.pixelColor[0]);
-  json_doc["ring1_color"]["red"] = rings.Red(rings.pixelColor[0]);
-  json_doc["ring1_color"]["blue"] = rings.Blue(rings.pixelColor[0]);
+  DynamicJsonDocument json_payload(1024);
+  DeserializationError error = deserializeJson(json_payload, payload);
 
-  json_doc["ring2_color"]["green"] = rings.Green(rings.pixelColor[1]);
-  json_doc["ring2_color"]["red"] = rings.Red(rings.pixelColor[1]);
-  json_doc["ring2_color"]["blue"] = rings.Blue(rings.pixelColor[1]);
+  if (error)
+  {
+    Serial.print(F("deserializeJson() failed: "));
+    Serial.println(error.f_str());
+    return;
+  }
+  else
+  {
+    // example JSON:
+    // {  "to": "30:C6:F7:25:C4:38",  "p": 3,  "i": 250,  "r": 255,  "g": 0,  "b": 0,  "n": 2   }
 
-  json_doc["ring3_color"]["green"] = rings.Green(rings.pixelColor[2]);
-  json_doc["ring3_color"]["red"] = rings.Red(rings.pixelColor[2]);
-  json_doc["ring3_color"]["blue"] = rings.Blue(rings.pixelColor[2]);
+    const String client_id = json_payload["to"];
+    const int ring_number = json_payload["n"];
+    const int pattern_num = json_payload["p"];
+    const int interval_speed = json_payload["i"];
+    const int red_value = json_payload["r"];
+    const int green_value = json_payload["g"];
+    const int blue_value = json_payload["b"];
 
-  serializeJson(json_doc, output);
-  return output;
+    if (client_id == macaddress.c_str())
+    { // is it destined for us?
+      Serial.print("Received command: ");
+      Serial.println(payload);
+
+      // do the command
+      rings.pixelColor[ring_number] = rings.Color(red_value, green_value, blue_value);
+      rings.Interval[ring_number] = interval_speed;
+      rings.ActivePattern[ring_number] = rings.GetPattern(pattern_num);
+
+      if (rings.ActivePattern[ring_number] != 0)
+      {
+        updateRing(ring_number, String(rings.ActivePattern[ring_number]).c_str());
+      }
+      else
+      {
+        updateRing(ring_number, "");
+      }
+    }
+  }
 }
 
+String configuration_menu()
+{
+  String s = String(wifi_html, wifi_html_len);
+  return s;
+}
+
+String report_light_status(bool b64 = false)
+{
+  // for mqtt and web status msgs
+  DynamicJsonDocument json_doc(1024);
+  String output;
+
+  constexpr uint32_t blue_offset{0x00};
+  constexpr uint32_t green_offset{0x08}; // 8 decimal
+  constexpr uint32_t red_offset{0x10};   // 16 decimal
+  constexpr uint32_t byte_mask{0xFF};
+  constexpr uint32_t blue_mask{byte_mask << blue_offset};
+  constexpr uint32_t green_mask{byte_mask << green_offset};
+  constexpr uint32_t red_mask{byte_mask << red_offset};
+
+  for (int i = 0; i <= rings.numberRings - 1; i++)
+  {
+    json_doc[macaddress][i]["p"] = rings.ActivePattern[i];
+    json_doc[macaddress][i]["i"] = rings.Interval[i];
+
+    // do colours
+    json_doc[macaddress][i]["c"]["r"] = (rings.pixelColor[i] & red_mask >> red_offset) & byte_mask;
+    json_doc[macaddress][i]["c"]["g"] = (rings.pixelColor[i] & green_mask >> green_offset) & byte_mask;
+    json_doc[macaddress][i]["c"]["b"] = (rings.pixelColor[i] & blue_mask >> blue_offset) & byte_mask;
+  }
+  json_doc["ti"] = (unsigned int)millis(); // cast long to int
+  json_doc["sc"] = "1.0";
+
+  serializeJson(json_doc, output);
+  if (b64)
+  {
+    String encoded = base64::encode(output);
+    return encoded;
+  }
+  else
+  {
+    return output;
+  }
+}
+
+void mqtt_connect()
+{
+  // connect mqtt
+  espClient.setCACert(root_ca);
+  espClient.setInsecure();
+  mqtt_client.setServer(mqtt_server, 8443);
+
+  if (mqtt_client.connect(macaddress.c_str()))
+  {
+    Serial.println("Attempting to connect to MQTT broker ...");
+    mqtt_client.setCallback(&mqtt_callback);
+    Serial.print("Subscribing: ");
+    Serial.println(mqtt_client.subscribe("towerlight/command"));
+  }
+  else
+  {
+    Serial.println("Could not connect to MQTT broker.");
+  }
+}
+
+void update_mqtt()
+{
+  if (mqtt_client.state() != MQTT_CONNECTED)
+  {
+    mqtt_connect();
+  }
+  else
+  {
+    const char *output = report_light_status(true).c_str();
+    mqtt_client.publish("towerlight/update", output);
+    Serial.println("Updating MQTT broker ...");
+  }
+}
+
+int lastUpdate = millis();
+void MQTTUpdate(void *parameter)
+{
+  for (;;)
+  {
+    if (millis() - lastUpdate >= 5000)
+    {
+      update_mqtt();
+      lastUpdate = millis();
+    }
+    mqtt_client.loop();
+    delay(50);
+  }
+}
+
+void (*resetFunc)(void) = 0;
 void start_webserver()
 {
+  Serial.println("Starting webserver...");
+
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->send(200, "text/html", configuration_menu()); });
+
+  server.on("/connect_wifi", HTTP_GET, [](AsyncWebServerRequest *request)
+            { 
+              bool res;
+              if (request->hasParam("ssid"))
+              {
+                String ssid = request->getParam("ssid")->value();
+                res = NVS.setString("ssid", ssid);
+              }
+
+              if (request->hasParam("password"))
+              {
+                String password = request->getParam("password")->value();
+                res = NVS.setString("psk", password);
+              }
+
+              request->send(200, "text/html", "<h1>Rebooting ...</h1>");
+              delay(2500);
+              resetFunc(); });
+
+  server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send(200, "application/json", report_light_status()); });
 
- 
   server.on("/light_on", HTTP_GET, [](AsyncWebServerRequest *request)
             {
               // get ring number
@@ -89,8 +282,7 @@ void start_webserver()
                 updateRing(ring_number, "");
               }
 
-              request->send(200, "application/json", report_light_status());
-            });
+              request->send(200, "application/json", report_light_status()); });
 
   server.on("/light_off", HTTP_GET, [](AsyncWebServerRequest *request)
             {
@@ -118,8 +310,7 @@ void start_webserver()
                 updateRing(ring_number, "");
               }
 
-              request->send(200, "application/json", report_light_status());
-            });
+              request->send(200, "application/json", report_light_status()); });
 
   server.on("/light_toggle", HTTP_GET, [](AsyncWebServerRequest *request)
             {
@@ -156,8 +347,7 @@ void start_webserver()
                 updateRing(ring_number, "");
               }
 
-              request->send(200, "application/json", report_light_status());
-            });
+              request->send(200, "application/json", report_light_status()); });
 
   server.on("/control", HTTP_GET, [](AsyncWebServerRequest *request)
             {
@@ -236,8 +426,13 @@ void start_webserver()
               {
                 interval_speed = 500;
               }
-              if (interval_speed > 5000 || interval_speed < 100)
-                pattern_num = 500;
+              
+              if (interval_speed < 100) {
+                interval_speed = 100;
+              } else if (interval_speed > 5000) {
+                interval_speed = 5000;
+              }
+                
 
               rings.pixelColor[ring_number] = rings.Color(red_value, green_value, blue_value);
               rings.Interval[ring_number] = interval_speed;
@@ -252,16 +447,12 @@ void start_webserver()
                 updateRing(ring_number, "");
               }
 
-              request->send(200, "application/json", report_light_status());
-            });
+              // send response
+              request->send(200, "application/json", report_light_status()); });
 
   server.onNotFound(notFound);
   server.begin();
 }
-
-// for storing the nvs values
-String nvs_ssid_config;
-String nvs_psk_config;
 
 // on connection, write nvs values
 static void WiFiEvent(WiFiEvent_t event)
@@ -277,7 +468,6 @@ static void WiFiEvent(WiFiEvent_t event)
     res = NVS.setString("psk", WiFi.psk());
 
     setMessage(""); // wifi is connected, clear the spinner label
-    start_webserver();
     break;
   case SYSTEM_EVENT_STA_DISCONNECTED:
     setMessage("Reconnecting ...");
@@ -310,9 +500,18 @@ void setup()
   // if no nvs settings, start smart config
   if (nvs_ssid_config == NULL || nvs_ssid_config == "")
   {
-    Serial.println("Starting Smart Config.");
-    setMessage("Use Smart Config on your phone.");
-    WiFi.beginSmartConfig();
+    configurationMode = true;
+    Serial.println("Starting configuration mode.");
+    WiFi.softAP(defaultSSID);
+
+    // get IP and start dns
+    IPAddress IP = WiFi.softAPIP();
+
+    // display our IP
+    start_webserver();
+    setMessage("http://" + IP.toString());
+    Serial.print("AP IP address: ");
+    Serial.println(IP);
   }
   else
   { // otherwise connect to the wifi creds and network we have
@@ -322,17 +521,27 @@ void setup()
     Serial.print("/");
     Serial.println(nvs_psk_config);
     WiFi.begin(nvs_ssid_config.c_str(), nvs_psk_config.c_str());
+    start_webserver();
   }
+
+  mqtt_client.setKeepAlive(15);
+  mqtt_client.setSocketTimeout(15);
+
+  xTaskCreatePinnedToCore(
+      MQTTUpdate,        /* Function to implement the task */
+      "TaskMQTTUpdates", /* Name of the task */
+      10000,             /* Stack size in words */
+      NULL,              /* Task input parameter */
+      0,                 /* Priority of the task */
+      &TaskMQTTUpdate,   /* Task handle. */
+      0);                /* Core where the task should run */
+
+  // give it time to catch up
+  delay(500);
 }
 
 void loop()
 {
   lv_task_handler();
   rings.Update();
-
-  // report the light status (convert char to String)
-  String json_doc_status = report_light_status();
-  char json_doc_char[1024];
-  json_doc_status.toCharArray(json_doc_char, 1024);
-  pubsub_Client.publish("json_status", json_doc_char);
 }

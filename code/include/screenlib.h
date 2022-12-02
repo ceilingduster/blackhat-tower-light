@@ -5,10 +5,13 @@
 #include <SPI.h>
 
 // style variables for screen
+static lv_style_t black_text;
 static lv_style_t black_bg;
 static lv_style_t white_text;
+static lv_style_t logo_text;
 
 // static variables
+static lv_obj_t *securex_logo;
 static lv_obj_t *sys_labels[5];
 static lv_obj_t *footer_labels[5];
 static lv_obj_t *ring_info[5];
@@ -38,3 +41,4 @@ void updateRing(int ring_number, const char* ring_message);
 static void sys_timer(lv_timer_t *timer);
 static void light_toggle_event_handler(lv_event_t *e);
 void start_screen_task();
+

@@ -78,7 +78,7 @@ void init_disp_driver()
   disp_drv.dpi = 180;
 
   lv_disp_drv_register(&disp_drv);                  // Finally register the driver
-  lv_disp_set_bg_color(NULL, lv_color_hex3(0x000)); // Set default background color to black
+  lv_disp_set_bg_color(NULL, lv_color_hex3(0x6DBF50)); // Set default background color to black
 }
 
 void my_touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
@@ -113,6 +113,7 @@ static void shutdown_poweroff(lv_event_t *event)
   M5.Axp.PowerOff(); // user wants us to poweroff/shutdown
 }
 
+void (*resetArduino)(void) = 0;
 static void reset_nvs_settings(lv_event_t *event)
 {
   lv_obj_add_flag(msgbox_panel, LV_OBJ_FLAG_HIDDEN);
@@ -124,9 +125,7 @@ static void reset_nvs_settings(lv_event_t *event)
   WiFi.disconnect();
   WiFi.mode(WIFI_AP_STA);
 
-  Serial.println("Starting Smart Config.");
-  setMessage("Use Smart Config on your phone.");
-  WiFi.beginSmartConfig();
+  resetArduino();
 }
 
 static void close_msgbox_panel(lv_event_t *event)
@@ -207,6 +206,7 @@ static void sys_timer(lv_timer_t *timer)
   // set the bat label
   // for debug: lv_label_set_text_fmt(sys_labels[3], "%s", String(batPercentage) + "%");
   lv_label_set_text_fmt(sys_labels[1], "%s %s", strCharging, strBatLevel);
+  lv_label_set_text_fmt(sys_labels[1], "%s %s", strCharging, strBatLevel);
 
   /* wifi info */
   if (WiFi.status() == WL_CONNECTED)
@@ -233,7 +233,7 @@ void setup_styles()
 {
   // background black style
   lv_style_init(&black_bg);
-  lv_style_set_bg_color(&black_bg, lv_color_hex(0x000000));
+  lv_style_set_bg_color(&black_bg, lv_color_hex(0x6DBF50));
   lv_style_set_radius(&black_bg, 0);
   lv_style_set_border_width(&black_bg, 1);
   lv_style_set_border_color(&black_bg, lv_color_hex(0x000000));
@@ -243,6 +243,14 @@ void setup_styles()
   // white text style
   lv_style_init(&white_text);
   lv_style_set_text_color(&white_text, lv_color_hex(0xffffff));
+
+  // black text style
+  lv_style_init(&black_text);
+  lv_style_set_text_color(&black_text, lv_color_hex(0x000000));
+
+  lv_style_init(&logo_text);
+  lv_style_set_text_color(&logo_text, lv_color_hex(0x7FDE5D));
+
 }
 
 void start_screen_task()
@@ -254,30 +262,40 @@ void start_screen_task()
   lv_color_t c = lv_color_make(0, 0, 0);
   lv_obj_add_style(main_panel, &black_bg, 0);
 
+  /* SecureX Logo Text */
+  securex_logo = lv_label_create(lv_scr_act());
+  lv_obj_align(securex_logo, LV_ALIGN_CENTER, 0, 0);
+  lv_label_set_text(securex_logo, "SecureX");
+  lv_obj_set_style_text_font(securex_logo, &lv_font_montserrat_48, 0);
+  lv_obj_add_style(securex_logo, &logo_text, 0);
+
   /* RING INFO */
   ring_info[0] = lv_label_create(lv_scr_act());
   lv_obj_align(ring_info[0], LV_ALIGN_LEFT_MID, 10, 0);
   lv_label_set_text(ring_info[0], "");
-  lv_obj_set_style_text_font(ring_info[0], &lv_font_montserrat_14, 0);
-  lv_obj_add_style(ring_info[0], &white_text, 0);
+  lv_obj_set_style_text_font(ring_info[0], &lv_font_montserrat_24, 0);
+  lv_obj_add_style(ring_info[0], &black_text, 0);
 
   ring_info[1] = lv_label_create(lv_scr_act());
   lv_obj_align(ring_info[1], LV_ALIGN_CENTER, 0, 0);
   lv_label_set_text(ring_info[1], "");
-  lv_obj_set_style_text_font(ring_info[1], &lv_font_montserrat_14, 0);
-  lv_obj_add_style(ring_info[1], &white_text, 0);
+  lv_obj_set_style_text_font(ring_info[1], &lv_font_montserrat_24, 0);
+  lv_obj_add_style(ring_info[1], &black_text, 0);
 
   ring_info[2] = lv_label_create(lv_scr_act());
   lv_obj_align(ring_info[2], LV_ALIGN_RIGHT_MID, -10, 0);
   lv_label_set_text(ring_info[2], "");
-  lv_obj_set_style_text_font(ring_info[2], &lv_font_montserrat_14, 0);
-  lv_obj_add_style(ring_info[2], &white_text, 0);
+  lv_obj_set_style_text_font(ring_info[2], &lv_font_montserrat_24, 0);
+  lv_obj_add_style(ring_info[2], &black_text, 0);
 
   /* spinner goes here, by default we'll hide it */
   objSpinner = lv_spinner_create(lv_scr_act(), 1000, 60);
   lv_obj_set_size(objSpinner, 100, 100);
   lv_obj_center(objSpinner);
   lv_obj_add_flag(objSpinner, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_set_style_arc_color(objSpinner, lv_color_hex(0x167331), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+  lv_obj_set_style_arc_opa(objSpinner, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+
 
   /* header/os information at top */
   labelSpinner = lv_label_create(lv_scr_act());

@@ -21,7 +21,8 @@ enum pattern
 #define NUMPIXELS 12
 #define NUMRINGS 3
 #define TOTALPIXELS NUMPIXELS *NUMRINGS
-#define RGBTYPE NEO_GRBW
+//#define RGBTYPE NEO_GRBW
+#define RGBTYPE NEO_GRB
 #define DELAYVAL 50
 
 class PatternLib : public Adafruit_NeoPixel
@@ -33,6 +34,7 @@ public:
     uint16_t TotalIndex;
     uint16_t numberPixels[NUMRINGS]; // number of pixels array
     uint32_t pixelColor[NUMRINGS];   // pixel color array
+    uint16_t numberRings = NUMRINGS;    
     pattern ActivePattern[NUMRINGS]; // which pattern is running
 
     void (*OnComplete)(); // Callback on completion of pattern
